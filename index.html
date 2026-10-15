@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UniBE-Agent</title>
+<meta name="description" content="Schritt-für-Schritt-Anleitung: einen KI-Coding-Agenten (OpenHands) lokal in Docker betreiben, mit dem Sprachmodell Qwen auf dem GPUStack der Universität Bern.">
+<style>
+:root {
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --text: #1d1d1b;
+  --muted: #5b5b57;
+  --line: #e3e0d8;
+  --accent: #b5121b;
+  --accent-soft: #fbeaea;
+  --code-bg: #f2f0ea;
+  --note-bg: #eef4fb;
+  --note-line: #3b6ea8;
+  --warn-bg: #fff6e0;
+  --warn-line: #b7860b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161615;
+    --surface: #1f1f1d;
+    --text: #ecebe7;
+    --muted: #a8a6a0;
+    --line: #34332f;
+    --accent: #ff6b6b;
+    --accent-soft: #3a1f1f;
+    --code-bg: #262623;
+    --note-bg: #1c2633;
+    --note-line: #6f9fd6;
+    --warn-bg: #2f2814;
+    --warn-line: #d9a93a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161615; --surface: #1f1f1d; --text: #ecebe7; --muted: #a8a6a0; --line: #34332f;
+  --accent: #ff6b6b; --accent-soft: #3a1f1f; --code-bg: #262623;
+  --note-bg: #1c2633; --note-line: #6f9fd6; --warn-bg: #2f2814; --warn-line: #d9a93a;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 80px; }
+header.hero { padding: 56px 0 28px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.kicker { color: var(--accent); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 13px; margin: 0 0 8px; }
+h1 { font-size: clamp(30px, 6vw, 42px); line-height: 1.15; margin: 0 0 14px; }
+.lede { font-size: 19px; color: var(--muted); margin: 0; }
+h2 { font-size: 24px; line-height: 1.3; margin: 56px 0 12px; scroll-margin-top: 16px; }
+h2 .num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%; margin-right: 10px;
+  background: var(--accent); color: #fff; font-size: 17px; vertical-align: 3px;
+}
+h3 { font-size: 18px; margin: 28px 0 6px; }
+p, li { max-width: 68ch; }
+a { color: var(--accent); }
+code, pre, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; line-height: 1.5; margin: 12px 0 18px;
+}
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); }
+figure { margin: 18px 0 24px; }
+figure img {
+  display: block; width: 100%; height: auto; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface);
+}
+figcaption { color: var(--muted); font-size: 14.5px; margin-top: 6px; }
+.box { border-left: 4px solid var(--note-line); background: var(--note-bg); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+.box.warn { border-color: var(--warn-line); background: var(--warn-bg); }
+.box p { margin: 6px 0; }
+.box strong:first-child { display: block; margin-bottom: 2px; }
+nav.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 28px 0; }
+nav.toc ol { margin: 6px 0 0; padding-left: 22px; }
+nav.toc li { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 15.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 20px 0; }
+.diagram svg { display: block; width: 100%; height: auto; }
+.diagram text { fill: var(--text); font: 13px system-ui, sans-serif; }
+.diagram .sub { fill: var(--muted); font-size: 11.5px; }
+.diagram rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+.diagram rect.hl { stroke: var(--accent); }
+.diagram line, .diagram path { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.diagram .dash { stroke-dasharray: 5 4; stroke: var(--accent); }
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14.5px; }
+.theme-toggle { position: absolute; top: 12px; right: 12px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 20px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.check li { list-style: none; position: relative; }
+.check { padding-left: 4px; }
+.check li::before { content: "☐"; position: absolute; left: -22px; color: var(--accent); }
+.check { margin-left: 22px; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="Hell/Dunkel umschalten">◐ Ansicht</button>
+<div class="wrap">
+
+<header class="hero">
+  <p class="kicker">Universität Bern · Digital Humanities</p>
+  <h1>Einen KI-Agenten auf dem eigenen Computer einrichten</h1>
+  <p class="lede">Diese Anleitung zeigt Schritt für Schritt, wie du <strong>OpenHands</strong> – einen KI-Agenten, der Dateien lesen, Code schreiben und Befehle ausführen kann – auf deinem Computer startest. Das Sprachmodell dahinter ist <strong>Qwen&nbsp;3.8</strong>, das auf den Servern der Universität Bern (GPUStack) läuft. Deine Texte gehen also nicht an einen kommerziellen Anbieter.</p>
+</header>
+
+<nav class="toc" aria-label="Inhalt">
+  <strong>Inhalt</strong>
+  <ol>
+    <li><a href="#ueberblick">Wie das Ganze zusammenhängt</a></li>
+    <li><a href="#voraussetzungen">Was du brauchst</a></li>
+    <li><a href="#vpn">Mit dem Uni-Netz verbinden (VPN)</a></li>
+    <li><a href="#docker">Docker installieren</a></li>
+    <li><a href="#apikey">Einen API-Schlüssel bei GPUStack holen</a></li>
+    <li><a href="#ordner">Den Arbeitsordner vorbereiten</a></li>
+    <li><a href="#starten">Den Agenten starten</a></li>
+    <li><a href="#einrichten">Das Modell in OpenHands eintragen</a></li>
+    <li><a href="#workspace">Den Projektordner freigeben</a></li>
+    <li><a href="#erste-aufgabe">Die erste Aufgabe</a></li>
+    <li><a href="#alltag">Stoppen, starten, aktualisieren</a></li>
+    <li><a href="#probleme">Wenn etwas nicht klappt</a></li>
+  </ol>
+</nav>
+
+<h2 id="ueberblick"><span class="num">1</span>Wie das Ganze zusammenhängt</h2>
+<p>Es gibt drei Teile. Du musst nicht verstehen, wie sie intern funktionieren – aber es hilft zu wissen, welcher Teil wo läuft:</p>
+<div class="diagram" role="img" aria-label="Schema: Browser auf deinem Computer spricht mit dem OpenHands-Container. Der Container liest und schreibt nur im Ordner projekte und fragt über das VPN das Modell Qwen auf GPUStack an der Uni Bern an.">
+<svg viewBox="0 0 680 230" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="10" width="440" height="210" rx="10"/>
+  <text x="26" y="34" font-weight="600">Dein Computer</text>
+  <rect x="30" y="56" width="150" height="62" rx="8"/>
+  <text x="44" y="82" font-weight="600">Browser</text>
+  <text x="44" y="102" class="sub">localhost:8031/canvas</text>
+  <rect x="230" y="56" width="200" height="62" rx="8" class="hl"/>
+  <text x="244" y="82" font-weight="600">OpenHands (Docker)</text>
+  <text x="244" y="102" class="sub">der Agent</text>
+  <rect x="230" y="148" width="200" height="56" rx="8"/>
+  <text x="244" y="172" font-weight="600">Ordner „projekte“</text>
+  <text x="244" y="190" class="sub">nur hier darf er arbeiten</text>
+  <line x1="180" y1="87" x2="230" y2="87"/>
+  <line x1="330" y1="118" x2="330" y2="148"/>
+  <rect x="510" y="56" width="160" height="62" rx="8"/>
+  <text x="524" y="82" font-weight="600">GPUStack Uni Bern</text>
+  <text x="524" y="102" class="sub">Modell qwen3.8-27b</text>
+  <path d="M430 87 L510 87" class="dash"/>
+  <text x="446" y="78" class="sub">VPN</text>
+</svg>
+</div>
+<ul>
+  <li><strong>OpenHands</strong> läuft in einem abgeschotteten „Container“ auf deinem Computer. Du bedienst ihn im Browser.</li>
+  <li><strong>Der Ordner <code>projekte</code></strong> ist das Einzige, was der Agent von deinem Computer sieht. Alles andere bleibt für ihn unsichtbar.</li>
+  <li><strong>Das Sprachmodell</strong> („das Gehirn“) läuft auf dem GPUStack-Server der Uni. Den erreichst du nur aus dem Uni-Netz oder über VPN.</li>
+</ul>
+
+<h2 id="voraussetzungen"><span class="num">2</span>Was du brauchst</h2>
+<ul class="check">
+  <li>Einen <strong>Campus-Account</strong> der Universität Bern</li>
+  <li><strong>Zugang zu GPUStack</strong> (gpustack.unibe.ch) mit Berechtigung für das Modell <code>qwen3.8-27b</code></li>
+  <li>Einen Computer mit <strong>macOS, Windows 10/11 oder Linux</strong>, mindestens 8 GB Arbeitsspeicher und rund 5 GB freiem Speicherplatz</li>
+  <li>Etwa <strong>30–45 Minuten</strong> Zeit beim ersten Mal</li>
+</ul>
+<p>Du brauchst keine Programmierkenntnisse. An zwei Stellen tippst du einen Befehl in ein „Terminal“ – das wird jeweils genau erklärt.</p>
+
+<h2 id="vpn"><span class="num">3</span>Mit dem Uni-Netz verbinden (VPN)</h2>
+<p>GPUStack ist nur innerhalb des Uni-Netzes erreichbar. Wenn du nicht im Uni-WLAN sitzt, verbinde dich zuerst mit dem VPN der Universität.</p>
+<ol>
+  <li>Installiere den VPN-Client nach der offiziellen Anleitung der Uni: <a href="https://serviceportal.unibe.ch/esc?id=kb_article_view&amp;sysparm_article=KB0010032">VPN-Client herunterladen, installieren und konfigurieren</a> (Serviceportal). Übersicht: <a href="https://www.unibe.ch/universitaet/campus__und__infrastruktur/rund_um_computer/internetzugang/zugang_auf_interne_ressourcen_mit_vpn/index_ger.html">Zugang auf interne Ressourcen mit VPN</a>.</li>
+  <li>Melde dich mit deinem Campus-Account an.</li>
+  <li>Lass das VPN verbunden, solange du mit dem Agenten arbeitest.</li>
+</ol>
+<div class="box">
+  <strong>Merksatz</strong>
+  <p>Ohne VPN lässt sich OpenHands zwar öffnen, aber der Agent antwortet nicht – ihm fehlt dann das Sprachmodell.</p>
+</div>
+
+<h2 id="docker"><span class="num">4</span>Docker installieren</h2>
+<p>Docker ist ein Programm, das andere Programme in abgeschotteten „Containern“ laufen lässt. So musst du OpenHands nicht selbst installieren, und es kann nichts ausserhalb seines Ordners verändern.</p>
+<ol>
+  <li>Lade <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> für dein Betriebssystem herunter und installiere es.
+    <ul>
+      <li><strong>Mac:</strong> Wähle die Version für deinen Prozessor (Apple-Chip M1/M2/M3/M4 oder Intel; unter  › „Über diesen Mac“ nachsehen). Alternativ funktioniert auch <a href="https://orbstack.dev/">OrbStack</a>.</li>
+      <li><strong>Windows:</strong> Das Installationsprogramm richtet bei Bedarf „WSL&nbsp;2“ ein und verlangt danach einen Neustart.</li>
+    </ul>
+  </li>
+  <li>Starte Docker Desktop einmal und warte, bis unten links „Engine running“ steht. Ein Docker-Konto brauchst du nicht – die Anmeldung kannst du überspringen.</li>
+</ol>
+
+<h3>Ein Terminal öffnen</h3>
+<p>Für die nächsten Schritte brauchst du ein Terminal – ein Fenster, in das du Befehle tippst:</p>
+<ul>
+  <li><strong>Mac:</strong> <kbd>⌘</kbd>+<kbd>Leertaste</kbd>, „Terminal“ eintippen, <kbd>Enter</kbd>.</li>
+  <li><strong>Windows:</strong> Startmenü öffnen, „PowerShell“ eintippen, <kbd>Enter</kbd>.</li>
+</ul>
+<p>Prüfe, ob Docker läuft. Tippe diesen Befehl ein und drücke <kbd>Enter</kbd>:</p>
+<pre><code>docker version</code></pre>
+<p>Wenn mehrere Zeilen mit „Client“ und „Server“ erscheinen, ist alles bereit. Erscheint eine Fehlermeldung, ist Docker Desktop noch nicht gestartet.</p>
+
+<h2 id="apikey"><span class="num">5</span>Einen API-Schlüssel bei GPUStack holen</h2>
+<p>Ein API-Schlüssel ist wie ein Passwort für Programme: Damit weist sich OpenHands bei GPUStack aus.</p>
+<ol>
+  <li>Öffne <a href="https://gpustack.unibe.ch">gpustack.unibe.ch</a> (VPN muss verbunden sein) und klicke auf <strong>Log in with SSO</strong>.
+    <figure>
+      <img src="img/01-gpustack-login.jpg" alt="Anmeldeseite von GPUStack mit dem blauen Knopf Log in with SSO" width="800" height="500" loading="lazy">
+      <figcaption>Die Anmeldeseite von GPUStack. „Log in with SSO“ führt zum Login der Uni.</figcaption>
+    </figure>
+  </li>
+  <li>Melde dich mit deinem Campus-Account an (dieselbe Anmeldung wie bei Outlook oder ILIAS).
+    <figure>
+      <img src="img/02-unibe-login.jpg" alt="Microsoft-Anmeldeseite der Universität Bern" width="800" height="500" loading="lazy">
+      <figcaption>Die Anmeldung der Uni. Hier gibst du deine Uni-E-Mail-Adresse und dein Passwort ein.</figcaption>
+    </figure>
+  </li>
+  <li>Klicke oben rechts auf das <strong>Personen-Symbol</strong> und dann auf <strong>API Keys</strong>.
+    <figure>
+      <img src="img/03-gpustack-menu.png" alt="Aufgeklapptes Benutzermenü in GPUStack mit dem Eintrag API Keys" width="530" height="302" loading="lazy">
+      <figcaption>Das Benutzermenü oben rechts.</figcaption>
+    </figure>
+  </li>
+  <li>Klicke auf <strong>+ Add API Key</strong>.
+    <figure>
+      <img src="img/04-gpustack-apikeys.jpg" alt="Seite API Keys mit dem blauen Knopf Add API Key" width="1456" height="839" loading="lazy">
+      <figcaption>Die Übersicht deiner Schlüssel. Beim ersten Mal ist die Liste leer.</figcaption>
+    </figure>
+  </li>
+  <li>Fülle das Formular aus:
+    <ul>
+      <li><strong>Name:</strong> etwas, woran du den Schlüssel wiedererkennst, z.&nbsp;B. <code>openhands</code></li>
+      <li><strong>Expiration:</strong> wie lange der Schlüssel gilt. „1 month“ ist ein guter Anfang; danach legst du einfach einen neuen an.</li>
+      <li><strong>Model Access:</strong> <strong>Allowed models</strong> wählen und das Häkchen bei <code>qwen3.8-27b</code> setzen. So kann der Schlüssel nur dieses Modell benutzen.</li>
+    </ul>
+    <figure>
+      <img src="img/05-gpustack-newkey.jpg" alt="Formular Add API Key mit Name openhands, Laufzeit 1 month und dem Modell qwen3.8-27b ausgewählt" width="1456" height="839" loading="lazy">
+      <figcaption>Das ausgefüllte Formular. Wichtig ist das Häkchen bei <code>qwen3.8-27b</code>.</figcaption>
+    </figure>
+  </li>
+  <li>Klicke auf <strong>Save</strong>. GPUStack zeigt dir jetzt den Schlüssel an. <strong>Kopiere ihn sofort</strong> – er wird nur dieses eine Mal angezeigt. Es dauert etwa eine Minute, bis er funktioniert.</li>
+</ol>
+<div class="box warn">
+  <strong>Den Schlüssel geheim halten</strong>
+  <p>Der Schlüssel wird nur einmal angezeigt. Kopiere ihn sofort in deinen Passwortmanager oder eine Notiz, die nur du siehst. Schick ihn nie per Mail oder Chat und lade ihn nie auf GitHub hoch. Wenn er doch in falsche Hände gerät: in GPUStack löschen und einen neuen anlegen.</p>
+</div>
+
+<h2 id="ordner"><span class="num">6</span>Den Arbeitsordner vorbereiten</h2>
+<p>Lege einen Ordner <code>unibe-agent</code> an und darin einen Unterordner <code>projekte</code>. In <code>projekte</code> legst du später alles, woran der Agent arbeiten soll.</p>
+<p><strong>Mac</strong> (im Terminal):</p>
+<pre><code>mkdir -p ~/unibe-agent/projekte
+cd ~/unibe-agent
+curl -fsSLO https://thodel.github.io/unibe-agent/compose.yaml</code></pre>
+<p><strong>Windows</strong> (in PowerShell):</p>
+<pre><code>mkdir $HOME\unibe-agent\projekte
+cd $HOME\unibe-agent
+curl.exe -fsSLO https://thodel.github.io/unibe-agent/compose.yaml</code></pre>
+<p>Der letzte Befehl lädt die Datei <a href="compose.yaml"><code>compose.yaml</code></a> herunter. Sie sagt Docker, welches Programm es starten soll und welchen Ordner es sehen darf. Du musst sie nicht verändern.</p>
+<div class="box">
+  <strong>Tipp: nur Kopien hineinlegen</strong>
+  <p>Der Agent darf im Ordner <code>projekte</code> Dateien ändern und löschen. Lege dort für den Anfang Kopien ab, nicht deine einzigen Originale.</p>
+</div>
+
+<h2 id="starten"><span class="num">7</span>Den Agenten starten</h2>
+<p>Bleib im selben Terminal-Fenster (im Ordner <code>unibe-agent</code>) und tippe:</p>
+<pre><code>docker compose up -d</code></pre>
+<p>Beim ersten Mal lädt Docker das Programm herunter (rund 2&nbsp;GB, je nach Verbindung einige Minuten). Danach öffne im Browser:</p>
+<pre><code>http://localhost:8031/canvas</code></pre>
+<p>„localhost“ heisst: Die Seite kommt von deinem eigenen Computer, nicht aus dem Internet. Niemand sonst kann darauf zugreifen. Die Zahl <code>8031</code> ist der „Port“ – eine Art Hausnummer auf deinem Computer.</p>
+<p>Tipp: Lege dir für diese Adresse ein Lesezeichen an.</p>
+
+<h2 id="einrichten"><span class="num">8</span>Das Modell in OpenHands eintragen</h2>
+<p>Beim ersten Öffnen führt dich ein kurzer Assistent durch die Einrichtung.</p>
+<h3>Agent auswählen</h3>
+<p>Lass <strong>OpenHands</strong> ausgewählt und klicke auf <strong>Weiter</strong>.</p>
+<figure>
+  <img src="img/10-oh-agent.jpg" alt="Assistent Agenten auswählen, OpenHands ist ausgewählt" width="800" height="500" loading="lazy">
+  <figcaption>Der erste Schritt des Assistenten: „OpenHands“ ist bereits ausgewählt.</figcaption>
+</figure>
+<h3>Sprachmodell eintragen</h3>
+<p>Wechsle oben auf den Reiter <strong>Erweitert</strong> und fülle die Felder so aus. Trag den API-Schlüssel <strong>gleich hier</strong> ein – sonst legt OpenHands ein Profil ohne Schlüssel an, und der Agent antwortet später nicht.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Feld</th><th>Eintrag</th></tr></thead>
+  <tbody>
+    <tr><td>Authentifizierung</td><td>API-Schlüssel</td></tr>
+    <tr><td>Benutzerdefiniertes Modell</td><td><code>openai/qwen3.8-27b</code></td></tr>
+    <tr><td>Basis-URL</td><td><code>https://gpustack.unibe.ch/v1</code></td></tr>
+    <tr><td>API-Schlüssel</td><td>dein Schlüssel aus Schritt 5</td></tr>
+  </tbody>
+</table>
+</div>
+<figure>
+  <img src="img/11-oh-llm.jpg" alt="Einstellungen im Reiter Erweitert: Modell openai/qwen3.8-27b und Basis-URL https://gpustack.unibe.ch/v1" width="800" height="500" loading="lazy">
+  <figcaption>Der Reiter „Erweitert“ (hier noch ohne Schlüssel). Das Präfix <code>openai/</code> ist richtig – es bedeutet nur, dass GPUStack dieselbe Schnittstelle wie OpenAI spricht. Deine Daten gehen trotzdem nur an die Uni.</figcaption>
+</figure>
+<p>Klicke auf <strong>Weiter</strong>. Im letzten Schritt („Sag Hallo“) kannst du auf <strong>Schliessen</strong> klicken – die erste Aufgabe stellen wir gleich mit dem richtigen Ordner.</p>
+<figure>
+  <img src="img/12-oh-hallo.jpg" alt="Letzter Schritt des Assistenten Sag Hallo mit Knopf Schliessen" width="800" height="500" loading="lazy">
+  <figcaption>Der letzte Schritt des Assistenten. Hier noch nichts eintippen, sondern „Schliessen“ – sonst arbeitet der Agent ohne deinen Projektordner.</figcaption>
+</figure>
+<div class="box warn">
+  <strong>Gelbe Leiste „Your LLM isn't set up yet“?</strong>
+  <p>Dann fehlt der API-Schlüssel. Klicke auf <strong>Set up LLM</strong> und trage ihn nach. Hast du mehrere Profile angelegt, wähl unter dem Eingabefeld (beim Modellnamen) das Profil mit Schlüssel aus.</p>
+</div>
+<figure>
+  <img src="img/13-oh-no-key.jpg" alt="Startseite von OpenHands mit gelber Warnleiste Your LLM isn't set up yet" width="800" height="500" loading="lazy">
+  <figcaption>So sieht es aus, wenn der Schlüssel fehlt. Mit Schlüssel verschwindet die gelbe Leiste.</figcaption>
+</figure>
+
+<h2 id="workspace"><span class="num">9</span>Den Projektordner freigeben</h2>
+<p>Damit der Agent mit deinen Dateien arbeiten kann, wählst du den Ordner <code>projekte</code> als „Workspace“:</p>
+<ol>
+  <li>Klicke unter dem Eingabefeld auf <strong>Open Workspace</strong>, dann im Auswahlfeld auf <strong>+ Add Workspace</strong>.</li>
+  <li>Klicke links auf <strong>/projects</strong> (so heisst dein Ordner <code>projekte</code> im Container) und dann auf <strong>Add this directory</strong>.
+    <figure>
+      <img src="img/14-oh-workspace.jpg" alt="Dialog Add workspaces mit dem Ordner /projects und dem Knopf Add this directory" width="800" height="500" loading="lazy">
+      <figcaption>Rechts siehst du die Unterordner deines Ordners <code>projekte</code> (hier ein Beispiel). Mit „Add this directory“ wird der ganze Ordner freigegeben.</figcaption>
+    </figure>
+  </li>
+  <li>Klicke auf <strong>Confirm</strong>. Unter dem Eingabefeld steht jetzt <strong>projects</strong>.
+    <figure>
+      <img src="img/15-oh-workspace-set.jpg" alt="Startseite mit gewähltem Workspace projects und Modell qwen3.8-27b" width="800" height="500" loading="lazy">
+      <figcaption>Workspace <code>projects</code> und Modell <code>qwen3.8-27b</code> sind gewählt.</figcaption>
+    </figure>
+  </li>
+</ol>
+
+<h2 id="erste-aufgabe"><span class="num">10</span>Die erste Aufgabe</h2>
+<p>Tippe eine Aufgabe ins Eingabefeld und drücke <kbd>Enter</kbd>. Für den Anfang eignet sich etwas Harmloses:</p>
+<pre><code>Liste alle Dateien im Workspace auf und beschreibe in drei Sätzen, worum es darin geht.</code></pre>
+<figure>
+  <img src="img/16-oh-ergebnis.jpg" alt="Abgeschlossene Unterhaltung: der Agent meldet, dass die Word-Datei einladung-kolloquium.docx im Workspace liegt" width="800" height="500" loading="lazy">
+  <figcaption>So sieht eine abgeschlossene Aufgabe aus: Der Agent fasst zusammen, was er getan hat, und nennt die Datei, die jetzt in <code>projekte</code> liegt. Ein grüner Haken in der Liste links heisst „fertig“.</figcaption>
+</figure>
+<p>Der Agent zeigt dir jeden Schritt: welche Befehle er ausführt, welche Dateien er liest und was er ändert. Lies mit, besonders am Anfang.</p>
+<h3>Gute Aufgaben für den Einstieg</h3>
+<ul>
+  <li>„Wandle alle Word-Dateien in <code>briefe/</code> in reinen Text um.“</li>
+  <li>„Zähle in <code>transkription.txt</code>, wie oft jeder Ortsname vorkommt, und speichere das Ergebnis als CSV.“</li>
+  <li>„Schreib einen Einladungsbrief als Word-Datei an …“ – siehe das Beispiel unten.</li>
+  <li>„Schreib ein kleines Python-Skript, das alle Dateinamen in <code>scans/</code> nach dem Muster Jahr_Nummer umbenennt – führ es aber erst aus, wenn ich zustimme.“</li>
+</ul>
+<div class="box">
+  <strong>Gut zu wissen</strong>
+  <p>Qwen&nbsp;3.8 ist ein „denkendes“ Modell: Vor der eigentlichen Antwort überlegt es oft eine Weile. Das ist normal. Es arbeitet langsamer als kommerzielle Dienste und macht Fehler – prüfe die Ergebnisse, bevor du dich darauf verlässt.</p>
+</div>
+<h3>Beispiel: ein Brief als Word-Datei</h3>
+<p>Für diese Anleitung haben wir den Agenten gebeten, einen kurzen Einladungsbrief zu einem Kolloquium als Word-Datei zu schreiben – mit Absender, Empfänger und Datum. Nach rund einer Minute lag die Datei im Ordner <code>projekte</code>:</p>
+<figure>
+  <img src="img/17-brief.png" alt="Erste Seite des vom Agenten erstellten Briefs mit Uni-Bern-Logo, Adressblock, Betreff und Text" width="636" height="900" loading="lazy" style="max-width:420px">
+  <figcaption>Der Brief des Agenten. Inhaltlich musste nachgebessert werden: Der Agent hatte eine Antwortfrist („bis zum 30. Oktober“) erfunden, die niemand verlangt hatte – und behauptete in seiner Zusammenfassung sogar das Gegenteil. Genau deshalb: immer lesen, bevor etwas verschickt wird.</figcaption>
+</figure>
+
+<h2 id="alltag"><span class="num">11</span>Stoppen, starten, aktualisieren</h2>
+<p>Alle Befehle tippst du im Terminal im Ordner <code>unibe-agent</code> (vorher <code>cd ~/unibe-agent</code>, unter Windows <code>cd $HOME\unibe-agent</code>).</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Was</th><th>Befehl</th></tr></thead>
+  <tbody>
+    <tr><td>Agent stoppen</td><td><code>docker compose down</code></td></tr>
+    <tr><td>Agent wieder starten</td><td><code>docker compose up -d</code></td></tr>
+    <tr><td>Läuft er?</td><td><code>docker compose ps</code></td></tr>
+    <tr><td>Was ist passiert? (Protokoll)</td><td><code>docker compose logs --tail 50</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>Solange Docker Desktop läuft, startet der Agent nach einem Neustart des Computers von selbst. Deine Einstellungen und Gespräche liegen im Ordner <code>openhands-daten</code> und bleiben beim Stoppen erhalten.</p>
+<p><strong>Aktualisieren:</strong> Lade die neueste <code>compose.yaml</code> erneut herunter (Befehl aus Schritt 6) und starte dann mit <code>docker compose up -d</code>. Docker holt die neue Version selbst.</p>
+<p><strong>Ganz entfernen:</strong> <code>docker compose down</code>, dann den Ordner <code>unibe-agent</code> löschen. Den API-Schlüssel in GPUStack ebenfalls löschen.</p>
+
+<h2 id="probleme"><span class="num">12</span>Wenn etwas nicht klappt</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Was du siehst</th><th>Was es bedeutet und was hilft</th></tr></thead>
+  <tbody>
+    <tr><td>„Api key not allowed to access model qwen3.8-27b“</td><td>Der Schlüssel darf dieses Modell nicht verwenden. In GPUStack einen Schlüssel anlegen, bei dem <code>qwen3.8-27b</code> erlaubt ist (Schritt 5).</td></tr>
+    <tr><td>„Connection error“, „timed out“ oder der Agent antwortet nicht</td><td>VPN prüfen. GPUStack ist nur im Uni-Netz erreichbar.</td></tr>
+    <tr><td>Die Seite <code>localhost:8031</code> lädt nicht</td><td>Läuft Docker Desktop? Dann <code>docker compose up -d</code> im Ordner <code>unibe-agent</code>.</td></tr>
+    <tr><td>„port is already allocated“</td><td>Ein anderes Programm belegt Port 8031. In <code>compose.yaml</code> die Zeile <code>"127.0.0.1:8031:8000"</code> zu <code>"127.0.0.1:8032:8000"</code> ändern, <code>docker compose up -d</code> ausführen und <code>localhost:8032/canvas</code> öffnen.</td></tr>
+    <tr><td>Der Agent sieht meine Dateien nicht</td><td>Liegen sie im Ordner <code>unibe-agent/projekte</code>? Ist der Workspace <code>projects</code> gewählt (Schritt 9)?</td></tr>
+    <tr><td>„Your LLM API key appears to be invalid“ oder gelbe Leiste „Your LLM isn't set up yet“</td><td>Das gewählte Profil hat keinen oder einen falschen Schlüssel. Unter dem Eingabefeld das richtige Profil wählen oder über <strong>Set up LLM</strong> den Schlüssel nachtragen.</td></tr>
+    <tr><td>In <code>projekte</code> taucht ein versteckter Ordner <code>.git</code> auf</td><td>Das legt OpenHands selbst an, um Änderungen nachverfolgen zu können. Einfach liegen lassen. Darum auch nie den ganzen Benutzerordner freigeben, sondern nur <code>projekte</code>.</td></tr>
+    <tr><td>Die Antwort bricht mitten im Satz ab</td><td>Das Modell hat sein Längenlimit erreicht. Die Aufgabe in kleinere Teile zerlegen.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer>
+  <p>Stand: 15. Oktober 2026 · OpenHands 1.27.1 · Modell <code>qwen3.8-27b</code> auf GPUStack der Universität Bern.</p>
+  <p>OpenHands ist ein Open-Source-Projekt: <a href="https://github.com/OpenHands/OpenHands">github.com/OpenHands/OpenHands</a>. Fehler in dieser Anleitung? <a href="https://github.com/thodel/unibe-agent/issues">Issue eröffnen</a>.</p>
+</footer>
+</div>
+<script>
+(function () {
+  var root = document.documentElement, key = 'unibe-agent-theme';
+  try { var saved = localStorage.getItem(key); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  document.querySelector('.theme-toggle').addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(key, next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

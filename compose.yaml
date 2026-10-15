@@ -1,0 +1,23 @@
+# UniBE-Agent: OpenHands mit Qwen auf GPUStack der Universität Bern
+# Anleitung: https://thodel.github.io/unibe-agent/
+#
+# Starten:   docker compose up -d
+# Öffnen:    http://localhost:8031/canvas
+# Stoppen:   docker compose down
+
+services:
+  openhands:
+    image: ghcr.io/openhands/agent-canvas:1.27.1
+    container_name: unibe-agent
+    restart: unless-stopped
+    ports:
+      # nur auf diesem Computer erreichbar, nicht im Netzwerk
+      - "127.0.0.1:8031:8000"
+    environment:
+      AGENT_CANVAS_ALLOW_LAN_SESSION_KEY: "true"
+      TZ: Europe/Zurich
+    volumes:
+      # Einstellungen und Gesprächsverläufe
+      - ./openhands-daten:/home/openhands/.openhands
+      # Nur diesen Ordner darf der Agent lesen und verändern
+      - ./projekte:/projects
